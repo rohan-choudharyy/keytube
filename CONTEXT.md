@@ -23,3 +23,11 @@ _Avoid_: hint overlay, selection mode
 **Badge**:
 The number label shown on a selectable video while in Hint Mode.
 _Avoid_: hint, marker, overlay
+
+**Chord**:
+Two keys pressed in sequence where the first arms the second, e.g. g then h.
+_Avoid_: shortcut, hotkey, combo
+
+**Page**:
+A group of up to 9 Badges shown at once while in Hint Mode.
+_Avoid_: sheet, batch, set
