@@ -25,9 +25,21 @@ The number label shown on a selectable video while in Hint Mode.
 _Avoid_: hint, marker, overlay
 
 **Chord**:
-Two keys pressed in sequence where the first arms the second, e.g. g then h.
+A navigation Binding of one or two presses; a two-press Chord fires only after its leader, e.g. g then h.
 _Avoid_: shortcut, hotkey, combo
 
-**Page**:
-A group of up to 9 Badges shown at once while in Hint Mode.
-_Avoid_: sheet, batch, set
+**Action**:
+A remappable keytube behavior, e.g. arming Hint Mode or going back in history.
+_Avoid_: command, shortcut, hotkey
+
+**Binding**:
+The key or modifier combo assigned to an Action, e.g. Enter or Ctrl+K.
+_Avoid_: shortcut, hotkey, combo
+
+**Tour**:
+The first-install slideshow inside the popup that explains Hint Mode, Chords, and which Bindings are remappable vs fixed. Shown once; no replay.
+_Avoid_: onboarding, tutorial, help page
+
+**Support Card**:
+The highlighted Ko-fi strip in the popup and the last Tour slide inviting support.
+_Avoid_: donate card, donation page, banner, ad

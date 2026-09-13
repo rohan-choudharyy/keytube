@@ -1,0 +1,428 @@
+/* keytube popup — compact hero card plus full-width binding rows.
+ *
+ * Structure adapted from the SafeLink reference (header row, hero with
+ * status mark, primary pill bar with action button, info block, labeled
+ * single-line lists below the card); palette stays keytube dark glass.
+ * Skills: glassmorphism (frost, lit edge, depth, reduced-transparency +
+ * @supports fallbacks) + refactoring-ui (HSL, scales, 4.5:1 text / 3:1
+ * functional edges, verified by script).
+ * No scrolling: rows are single-line and full-width so nothing
+ * truncates and the whole catalogue fits the popup window.
+ */
+body {
+  width: 360px;
+  margin: 0;
+  max-height: 600px;
+  overflow: hidden;
+  background: #000;
+  color: hsl(240, 5%, 96%);
+  font: 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.card {
+  margin: 6px 8px 0;
+  background: rgba(20, 20, 23, 0.8);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  padding: 8px 12px;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .card { background: hsl(240, 4%, 8%); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card {
+    background: hsl(240, 4%, 8%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Header row: logo tile + wordmark, live count pinned right. */
+header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: none;
+}
+header strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+header span { color: hsl(240, 4%, 66%); font-size: 11px; }
+#key-count {
+  margin-left: auto;
+  color: hsl(240, 4%, 60%);
+  font-size: 11px;
+  white-space: nowrap;
+}
+#key-count:empty { display: none; }
+
+/* Compact hero: status mark beside headline + live subline. */
+.hero {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+}
+.orbit {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+.orbit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.5px dashed hsl(240, 4%, 45%);
+  border-radius: 50%;
+  animation: orbit 24s linear infinite;
+}
+.orbit img {
+  position: absolute;
+  inset: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(240, 6%, 16%);
+}
+@keyframes orbit { to { transform: rotate(360deg); } }
+.hero-text { min-width: 0; }
+.hero h1 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+#summary {
+  margin: 1px 0 0;
+  font-size: 11px;
+  color: hsl(240, 4%, 66%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#summary:empty { display: none; }
+
+/* Primary pill bar: live Hint Mode state plus Change action. */
+.hintbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 3px 3px 3px 10px;
+  font-size: 12px;
+  color: hsl(240, 4%, 72%);
+}
+.hintbar b { color: hsl(240, 5%, 96%); font-weight: 600; }
+.hint-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(152, 60%, 55%);
+  flex: none;
+}
+.hint-dot.busy {
+  background: hsl(0, 84%, 68%);
+  animation: blink 1s infinite;
+}
+#hint-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hint-change {
+  flex: none;
+  background: hsl(0, 0%, 96%);
+  color: hsl(220, 20%, 8%);
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#hint-change:hover { filter: brightness(0.94); }
+#hint-change:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+#hint-change:active { transform: translateY(1px); }
+
+/* Binding lists: full-width single-line rows under a hairline rule.
+ * Labels never truncate; per-row reset appears on hover or focus.
+ * Tight vertical rhythm so header + 14 rows + Support Card + footer
+ * all fit the 600px popup viewport with no scrolling. */
+main { padding: 0 12px; }
+section h2 {
+  margin: 4px 4px 1px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: hsl(240, 4%, 60%);
+}
+section > div {
+  border-left: 1px solid hsl(240, 3%, 24%);
+  margin-left: 4px;
+  padding-left: 2px;
+}
+.row {
+  position: relative;
+  padding: 0 4px 0 20px;
+}
+.row::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+}
+.row[data-ns="chord"]::before {
+  background: hsl(240, 4%, 58%);
+  border-radius: 2px;
+}
+.row[data-ns="single"]::before {
+  border: 1.5px solid hsl(240, 4%, 58%);
+  border-radius: 50%;
+}
+.row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.row-top label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: hsl(240, 4%, 72%);
+}
+kbd {
+  flex: none;
+  text-align: center;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid hsl(240, 3%, 45%);
+  border-radius: 6px;
+  padding: 0 5px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10.5px;
+  line-height: 1.6;
+  font-weight: 600;
+  color: hsl(240, 5%, 96%);
+}
+kbd:hover { border-color: hsl(240, 4%, 60%); }
+kbd:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+kbd.recording {
+  border-color: hsl(0, 84%, 68%);
+  color: hsl(0, 84%, 68%);
+  background: hsl(0, 55%, 15%);
+  animation: blink 1s infinite;
+}
+kbd.empty { color: hsl(240, 4%, 60%); border-style: dashed; }
+@keyframes blink { 50% { opacity: 0.5; } }
+
+.row .mini:not(.link) {
+  flex: none;
+  background: none;
+  border: none;
+  color: hsl(240, 4%, 55%);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px;
+  opacity: 0;
+}
+.row:hover .mini,
+.row:focus-within .mini {
+  opacity: 1;
+}
+.row .mini:hover { color: #fff; }
+.row .mini:focus-visible {
+  opacity: 1;
+  outline: 2px solid hsl(212, 90%, 68%);
+  outline-offset: 2px;
+}
+.mini {
+  background: none;
+  border: none;
+  color: hsl(240, 4%, 55%);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px;
+}
+.mini.link {
+  color: hsl(212, 90%, 72%);
+  font-size: 11px;
+  padding: 0;
+  margin-top: 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.warn { color: hsl(42, 95%, 64%); font-size: 11px; margin: 1px 0 0; }
+.error { color: hsl(0, 84%, 70%); font-size: 11px; margin: 1px 0 0; }
+.hint { color: hsl(240, 4%, 60%); font-size: 11px; margin: 1px 0 0; }
+
+footer { padding: 4px 12px 6px; border-top: 1px solid hsl(240, 3%, 20%); }
+
+/* Support Card: permanent Ko-fi strip between Binding groups and footer.
+ * Contrasts the dark glass theme with a Ko-fi blue edge + button so it
+ * reads as external support, never as a remappable Action.
+ * Single-line compact so the whole popup fits without scrolling. */
+.support-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 12px 3px;
+  padding: 5px 6px 5px 10px;
+  background: hsl(240, 4%, 10%);
+  border: 1px solid hsl(197, 73%, 52%);
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px hsla(197, 73%, 52%, 0.25), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.support-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: hsl(240, 5%, 96%);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.support-text span { color: hsl(240, 4%, 72%); }
+#support-kofi {
+  flex: none;
+  background: hsl(197, 73%, 52%);
+  color: hsl(200, 80%, 8%);
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+#support-kofi:hover { filter: brightness(1.08); }
+#support-kofi:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+#support-kofi:active { transform: translateY(1px); }
+#reset-all {
+  width: 100%;
+  background: transparent;
+  color: hsl(240, 4%, 72%);
+  border: 1px solid hsl(240, 3%, 40%);
+  border-radius: 8px;
+  padding: 2px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+#reset-all:hover { color: hsl(240, 5%, 96%); border-color: hsl(240, 4%, 45%); }
+#reset-all:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+#fixed-note { color: hsl(240, 4%, 60%); font-size: 11px; margin: 2px 0 0; }
+#fixed-note:empty { display: none; }
+
+/* First-install Tour: full-popup slideshow overlay, shown once. */
+#tour {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: hsl(240, 4%, 8%);
+  padding: 16px 14px;
+}
+#tour[hidden] { display: none; }
+.tour-card { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.tour-card h2 { margin: 0; font-size: 14px; letter-spacing: -0.01em; }
+.tour-card p { margin: 0; font-size: 12px; color: hsl(240, 4%, 78%); }
+.tour-card kbd {
+  border: 1px solid hsl(240, 3%, 45%);
+  border-radius: 6px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tour-dots { display: flex; gap: 6px; margin-top: 4px; }
+.tour-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(240, 3%, 30%);
+}
+.tour-dots span.on { background: hsl(0, 0%, 96%); }
+.tour-nav { margin-top: auto; display: flex; gap: 8px; }
+.tour-nav button {
+  flex: 1;
+  border-radius: 8px;
+  padding: 5px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+#tour-next {
+  background: hsl(0, 0%, 96%);
+  color: hsl(220, 20%, 8%);
+  border: none;
+}
+#tour-back, #tour-skip {
+  background: transparent;
+  color: hsl(240, 4%, 72%);
+  border: 1px solid hsl(240, 3%, 40%);
+}
+.tour-nav button:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+#tour-kofi {
+  display: inline-block;
+  width: fit-content;
+  background: hsl(197, 73%, 52%);
+  color: hsl(200, 80%, 8%);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: 4px;
+}
+#tour-kofi[hidden] { display: none; }
+#tour-kofi:focus-visible { outline: 2px solid hsl(212, 90%, 68%); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit::before,
+  kbd.recording,
+  .hint-dot.busy {
+    animation: none;
+  }
+  #hint-change:active { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card {
+    background: hsl(240, 4%, 8%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

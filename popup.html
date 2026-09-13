@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>keytube bindings</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<div class="card">
+  <header>
+    <img class="logo" src="icon48.png" alt="" width="24" height="24" />
+    <strong>keytube</strong>
+    <span>key bindings</span>
+    <span id="key-count"></span>
+  </header>
+  <div class="hero">
+    <div class="orbit" aria-hidden="true"><img src="icon48.png" alt="" width="36" height="36" /></div>
+    <div class="hero-text">
+      <h1>Full keyboard, no mouse.</h1>
+      <p id="summary"></p>
+    </div>
+  </div>
+  <div class="hintbar">
+    <span class="hint-dot" id="hint-dot" aria-hidden="true"></span>
+    <span id="hint-text"></span>
+    <button id="hint-change" type="button">Change &#8594;</button>
+  </div>
+</div>
+<main id="groups"></main>
+<aside class="support-card" aria-label="Support keytube">
+  <div class="support-text">
+    <strong>keytube is free</strong>
+    <span>chip in if it saves you time.</span>
+  </div>
+  <button id="support-kofi" type="button">Support on Ko-fi</button>
+</aside>
+<footer>
+  <button id="reset-all" type="button">Reset everything</button>
+  <p id="fixed-note"></p>
+</footer>
+<div id="tour" hidden>
+  <div class="tour-card" role="dialog" aria-label="keytube quick tour">
+    <h2 id="tour-title"></h2>
+    <p id="tour-body"></p>
+    <a id="tour-kofi" hidden href="https://ko-fi.com/rohvnwho/goal?g=12" target="_blank" rel="noopener">Support on Ko-fi →</a>
+    <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
+    <div class="tour-nav">
+      <button id="tour-back" type="button">← Back</button>
+      <button id="tour-skip" type="button">Skip</button>
+      <button id="tour-next" type="button">Next →</button>
+    </div>
+  </div>
+</div>
+<script src="bindings-defaults.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

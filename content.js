@@ -1,8 +1,9 @@
 // keytube content script — plain JS, no build, no deps.
-// Glossary: Feed, Watch-next, Player, Hint Mode, Badge, Chord, Page (see CONTEXT.md).
+// Glossary: Feed, Watch-next, Player, Hint Mode, Badge, Chord (see CONTEXT.md).
 // Runs in MAIN world (see manifest.json "world": "MAIN") so capture-phase
 // stopImmediatePropagation() beats YouTube's own handlers for keys we steal.
-// Hint Mode is armed with Enter, so native `f` fullscreen is left untouched.
+// Bindings arrive live from bridge.js via the "keytube:bindings" window event
+// (MAIN world can't touch chrome.*). Falls back to shipped defaults.
 // Uses zero chrome.* APIs, so MAIN world is safe.
 (() => {
   const SELECTORS = [
@@ -18,19 +19,32 @@
   ].join(", ");
   const PAGE_SIZE = 9;
   const CHORD_TIMEOUT = 1500;
-  // Chord destinations: first key arms, second selects (g then h = home, etc.).
-  const CHORDS = {
-    h: "/",
-    s: "/feed/subscriptions",
-    t: "/feed/trending",
-    w: "/feed/history",
-    l: "/feed/library",
+  // Chord destinations: leader then second selects (g then h = home, etc.).
+  // Second-press Bindings live in the "chord" namespace; single-press
+  // Bindings live in "single". Sharing across namespaces is intentional
+  // (t = theater and Chord trending); uniqueness is enforced per namespace.
+  const CHORD_PATHS = {
+    chordHome: "/",
+    chordSubs: "/feed/subscriptions",
+    chordTrending: "/feed/trending",
+    chordHistory: "/feed/history",
+    chordLibrary: "/feed/library",
   };
+  const CHORD_IDS = ["chordHome", "chordSubs", "chordTrending", "chordHistory", "chordLibrary", "chordSearch"];
+
+  // Live Bindings by Action id. Start from shipped defaults so keys work
+  // before the isolated bridge delivers stored Bindings; updated live via
+  // the "keytube:bindings" window event (MAIN world can't touch chrome.*).
+  const KT = globalThis.KEYTUBE || {};
+  let B = KT.sanitizeBindings ? KT.sanitizeBindings(null) : { ...(KT.DEFAULTS || {}) };
+  const isBinding = (e, id) => (KT.matchesEvent ? KT.matchesEvent(e, B[id]) : false);
+  const bindingName = (id) => (KT.displayName ? KT.displayName(B[id]) : String((B[id] || {}).key || "?"));
+  window.addEventListener(KT.EVENT_NAME || "keytube:bindings", (ev) => {
+    if (ev && ev.detail && KT.sanitizeBindings) B = KT.sanitizeBindings(ev.detail);
+  });
   let armed = false;
-  let items = []; // current Page of elements (max PAGE_SIZE)
-  let allItems = []; // every visible element in the viewport
-  let page = 0;
-  let chord = null; // pending Chord first key, e.g. "g"
+  let items = []; // visible elements Badged right now (max PAGE_SIZE)
+  let chord = null; // pending Chord leaders: {first, ids} awaiting a second press
   let box = null;
   let pill = null;
 
@@ -96,19 +110,11 @@
     );
   }
 
-  function pageCount() {
-    return Math.max(1, Math.ceil(allItems.length / PAGE_SIZE));
-  }
-
   function pillText() {
-    const total = allItems.length;
-    const pages = pageCount();
-    return `keytube: HINTS ${page * PAGE_SIZE + 1}–${Math.min(total, (page + 1) * PAGE_SIZE)} of ${total} (Page ${page + 1}/${pages}) — [ ] pages, Enter/Esc exits`;
+    return `keytube: HINTS 1–${items.length} — 1–9 selects, ${bindingName("hintArm")}/Esc exits`;
   }
 
-  function renderPage() {
-    page = Math.min(Math.max(0, page), pageCount() - 1);
-    items = allItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  function renderBadges() {
     box.replaceChildren(); // not innerHTML: YouTube enforces Trusted Types
     items.forEach((el, i) => {
       const r = el.getBoundingClientRect();
@@ -122,20 +128,19 @@
 
   function rescan(retry = true) {
     // ponytail: query-on-arm, no MutationObserver pre-index; Badges track the viewport
-    allItems = visibleItems();
-    if (!allItems.length) {
+    items = visibleItems().slice(0, PAGE_SIZE);
+    if (!items.length) {
       // Watch page lazy-renders the Watch-next rail after nav: one retry.
       if (retry) {
         setTimeout(() => {
           if (!armed) return;
-          allItems = visibleItems();
-          if (!allItems.length) {
+          items = visibleItems().slice(0, PAGE_SIZE);
+          if (!items.length) {
             showPill("keytube: no videos found — layout changed?", 2500);
             armed = false;
             return;
           }
-          page = 0;
-          renderPage();
+          renderBadges();
         }, 600);
         showPill("keytube: waiting for videos…", 600);
         return;
@@ -144,8 +149,7 @@
       armed = false;
       return;
     }
-    page = 0; // viewport content changed: restart from Page 1
-    renderPage();
+    renderBadges();
   }
 
   function openLink(link) {
@@ -163,7 +167,6 @@
 
   function arm() {
     ensureUI();
-    page = 0;
     armed = true;
     rescan(); // clears armed when the Feed has no visible videos
   }
@@ -171,8 +174,6 @@
   function disarm() {
     armed = false;
     items = [];
-    allItems = [];
-    page = 0;
     if (box) box.replaceChildren();
     if (pill) pill.style.display = "none";
   }
@@ -207,49 +208,65 @@
     if (pill && !armed) pill.style.display = "none";
   }
 
-  function armChord(first) {
-    chord = first;
+  function armChord(ids) {
+    const first = B[ids[0]].first;
+    chord = { first, ids };
     clearTimeout(cancelChord.t);
     cancelChord.t = setTimeout(cancelChord, CHORD_TIMEOUT);
-    showPill("keytube: g… (h home, s subs, t trending, w history, l library, / search)", 0);
+    const shorts = { chordHome: "home", chordSubs: "subs", chordTrending: "trending", chordHistory: "history", chordLibrary: "library", chordSearch: "search" };
+    const secondName = (id) => (KT.displayName ? KT.displayName(B[id].second) : String(B[id].second.key));
+    const parts = ids.map((id) => `${secondName(id)} ${shorts[id]}`).join(", ");
+    showPill(`keytube: ${KT.displayName(first)}… (${parts})`, 0);
   }
 
-  function runChord(second) {
+  function runChord(id) {
     cancelChord();
-    if (second === "/") {
+    if (id === "chordSearch") {
       // search Chord: focus YouTube search, same target as native `/`
       const q = document.querySelector("input#search") || document.querySelector('input[name="search_query"]');
       if (q) q.focus();
       return true;
     }
-    const dest = CHORDS[second.toLowerCase()];
+    const dest = CHORD_PATHS[id];
     if (dest) location.assign(dest);
     return !!dest;
+  }
+
+  // Bare Enter/Space activate focused links and buttons natively; a Binding
+  // for those keys must not steal that activation.
+  function focusKeepsKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key !== "Enter" && e.key !== " ") return false;
+    const ae = document.activeElement;
+    return !!ae && /^(A|BUTTON|SELECT)$/.test(ae.tagName);
   }
 
   document.addEventListener(
     "keydown",
     (e) => {
       if (!e.isTrusted || e.isComposing) return;
-      // Feed scroll: Ctrl+Up / Ctrl+Down scrolls the viewport ~70%, stays armed
-      // so Badges rescan via the scroll listener. Allows hold-to-repeat.
-      if (e.ctrlKey && !e.metaKey && !e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      const k = e.key;
+      const mods = e.ctrlKey || e.metaKey || e.altKey;
+
+      // Feed scroll Actions: may carry modifiers, work armed or not, hold-to-repeat.
+      // Badges rescan via the scroll listener, so Hint Mode stays armed.
+      if (isBinding(e, "feedScrollUp") || isBinding(e, "feedScrollDown")) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        const delta = Math.round(innerHeight * 0.7) * (e.key === "ArrowUp" ? -1 : 1);
+        const delta = Math.round(innerHeight * 0.7) * (isBinding(e, "feedScrollUp") ? -1 : 1);
         window.scrollBy({ top: delta, behavior: e.repeat ? "auto" : "smooth" });
         return;
       }
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const k = e.key;
 
       if (armed) {
-        e.stopImmediatePropagation();
-        if (k === "Escape") {
+        if (k === "Escape" && !mods) {
           e.preventDefault();
+          e.stopImmediatePropagation();
           disarm();
-        } else if (k >= "1" && k <= "9") {
+        } else if (!mods && k >= "1" && k <= "9") {
+          // Fixed selection keys; modified digits (Ctrl+1 tab switch…) pass through.
           e.preventDefault();
+          e.stopImmediatePropagation();
           const target = items[Number(k) - 1];
           if (!target) return; // out of range: stay armed
           const ok = openLink(linkFor(target));
@@ -258,18 +275,19 @@
             console.warn("[keytube] no link found on item", Number(k));
             showPill("keytube: no link on that video", 2000);
           }
-        } else if (k === "[") {
+        } else if (!mods && k === " ") {
+          // No paging: Space must not scroll the Feed while armed.
           e.preventDefault();
-          page = (page + pageCount() - 1) % pageCount();
-          renderPage();
-        } else if (k === "]" || k === " ") {
-          // next Page; Space must not scroll the Feed
+          e.stopImmediatePropagation();
+        } else if (isBinding(e, "hintArm")) {
           e.preventDefault();
-          page = (page + 1) % pageCount();
-          renderPage();
-        } else if (k === "Enter") {
-          e.preventDefault();
+          e.stopImmediatePropagation();
           disarm(); // toggle off
+        } else if (mods) {
+          return; // browser shortcuts (close tab, tab switch…) pass through untouched
+        } else {
+          // Swallow other bare keys while armed: no seek/fullscreen mid-selection.
+          e.stopImmediatePropagation();
         }
         return;
       }
@@ -280,54 +298,72 @@
       }
       if (e.repeat) return;
 
-      // Chord: a pending first key (e.g. g) claims this keystroke.
+      // Chord: a matched leader arms its destinations; the next press completes.
       if (chord) {
-        if (k === "Escape") {
+        if (k === "Escape" && !mods) {
           e.preventDefault();
           cancelChord();
           return;
         }
-        if (k === "/" || CHORDS[k.toLowerCase()] !== undefined) {
+        const hit = chord.ids.find((id) => B[id] && B[id].second && KT.matchesEvent(e, B[id].second));
+        if (hit) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          runChord(k);
+          runChord(hit);
           return;
         }
         cancelChord(); // unknown second key: fall through, handle k normally
       }
 
-      if (k === "g") {
+      // Leaders take precedence over single-press Actions on this keystroke.
+      const leaders = CHORD_IDS.filter((id) => B[id] && B[id].first && KT.matchesEvent(e, B[id].first));
+      if (leaders.length) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        armChord("g");
-      } else if (k === "Enter") {
+        armChord(leaders);
+      } else if (isBinding(e, "hintArm")) {
         // Hint Mode arm; native `f` fullscreen is left untouched.
-        // Let focused links/buttons keep native Enter activation.
-        const ae = document.activeElement;
-        if (ae && /^(A|BUTTON|SELECT)$/.test(ae.tagName)) return;
+        if (focusKeepsKey(e)) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         arm();
-      } else if (k === "Escape") {
+      } else if (k === "Escape" && !mods) {
         cancelChord();
         disarm();
-      } else if (k === "t") {
+      } else if (isBinding(e, "theater")) {
+        if (focusKeepsKey(e)) return;
         e.preventDefault();
+        e.stopImmediatePropagation();
         theater();
-      } else if (k === "e") {
+      } else if (isBinding(e, "speedToggle")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         const v = video();
         if (v) v.playbackRate = v.playbackRate === 2 ? 1 : 2;
-      } else if (k === "n") {
+      } else if (isBinding(e, "nextInRail")) {
+        if (focusKeepsKey(e)) return;
         e.preventDefault();
+        e.stopImmediatePropagation();
         nextInRail();
-      } else if (k === "p" || k === "H") {
-        // history back; H mirrors Vimium, p is the legacy alias
+      } else if (isBinding(e, "historyBack") || (!mods && k === "H" && B.historyBack)) {
+        // H mirrors Vimium; active only while the Action itself is assigned.
         e.preventDefault();
+        e.stopImmediatePropagation();
         history.back();
-      } else if (k === "L") {
-        // history forward; lowercase l stays native (+10s seek)
+      } else if (isBinding(e, "historyForward")) {
+        // Lowercase l stays native (+10s seek) unless remapped onto it.
         e.preventDefault();
+        e.stopImmediatePropagation();
         history.forward();
+      } else {
+        // Leaderless Chords (no first): the second fires on a single press.
+        const solo = CHORD_IDS.find((id) => B[id] && !B[id].first && B[id].second && KT.matchesEvent(e, B[id].second));
+        if (solo) {
+          if (focusKeepsKey(e)) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          runChord(solo);
+        }
       }
       // Everything else (f/F fullscreen, k/j/l/m/c/i, arrows, Shift+N/P, /, 0-9 seek): native YouTube.
     },
@@ -343,11 +379,10 @@
     requestAnimationFrame(() => {
       scrollQueued = false;
       if (!armed) return;
-      const found = visibleItems();
+      const found = visibleItems().slice(0, PAGE_SIZE);
       if (!found.length) return;
-      allItems = found;
-      page = 0;
-      renderPage();
+      items = found;
+      renderBadges();
     });
   }
   // capture=true: Watch-next rail can scroll in a nested container, not window.
